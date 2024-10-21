@@ -1,6 +1,6 @@
 # standard libraries
 import logging
-
+import os
 import yaml
 from pathlib import Path
 from typing import Optional
@@ -126,7 +126,7 @@ class UltralyticsAdapter(BaseModelAdapter):
                     lr0=schedulers_cfg.lrf,
                 )
         if optimizers_cfg is not None:
-            self.opt.update(optimizer=optimizers_cfg.name)
+            self.opt.update(optimizer=optimizers_cfg._target_.split(".")[-1])
         with open("hyp.yaml", "w+") as f:
             yaml.dump(self.hyp, f)
 
@@ -146,38 +146,43 @@ class UltralyticsAdapter(BaseModelAdapter):
 
     def train(self, data: UltralyticsDataModuleAdapter, ckpt_path=None):
         data.setup()
+        name = str(self.log_dir).replace(str(self.log_dir.parents[2]) + os.sep, "")
+        self.opt.update(
+            project="train",
+            name=name,)
 
-        if ckpt_path is None:
-            self.opt.update(
-                project="something",
-                device=self.device,
-                epochs=self.epochs,
-                imgsz=data.imgsz,
-                data=data.data,
-                workers=data.workers,
-                batch=data.batch_size,
-            )
-            self.model.train(**self.opt, **self.hyp)
-        else:
+        if ckpt_path is not None:
             try:
                 ckpt_path = TorchCheckpointHandler().convert_to_regular_ckpt(
-                    ckpt_path, inplace=False, dst_path=None
+                    ckpt_path, inplace=False, dst_path=None, set_epoch=0
                 )
                 self.opt.update(resume=str(ckpt_path))
-                self.model.train(**self.opt, **self.hyp)
-            except:
-                pass
+                self.model.ckpt["epoch"] = 0
+                self.model.ckpt_path = ckpt_path
+            except Exception as e:
+                print(e)
+
+        self.opt.update(
+            device=self.device,
+            epochs=self.epochs,
+            imgsz=data.imgsz,
+            data=data.data,
+            workers=data.workers,
+            batch=data.batch_size,
+        )
+        self.model.train(**self.opt, **self.hyp)
 
         self.update_checkpoints_path()
 
     def predict(self, data: UltralyticsDataModuleAdapter, ckpt_path=None):
         data.setup()
 
-        ckpt_path = TorchCheckpointHandler().convert_to_regular_ckpt(
-            ckpt_path, inplace=False, dst_path=None
-        )
+        if ckpt_path:
+            ckpt_path = TorchCheckpointHandler().convert_to_regular_ckpt(
+                ckpt_path, inplace=False, dst_path=None
+            )
 
-        self.model._load(ckpt_path)
+            self.model._load(str(ckpt_path))
 
         params = dict(
             conf=0.25,
@@ -185,14 +190,12 @@ class UltralyticsAdapter(BaseModelAdapter):
             save=True,
             device=self.device,
             augment=False,
+            project=str(self.log_dir.parent),
+            name=str(self.log_dir.name),
         )
-        if str(data.infer_source).startswith("rts"):
-            params.update(source=data.infer_source)
-        else:
-            params.update(source=data.infer_source / "images")
-
+        params.update(source=str(data.infer_source))
+        params.update(exist_ok=True)
         self.model.predict(**params)
-
         self.update_checkpoints_path()
 
     def test(self, data: UltralyticsDataModuleAdapter, ckpt_path=None):

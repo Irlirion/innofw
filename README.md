@@ -1,6 +1,5 @@
 [![Documentation Status](https://readthedocs.org/projects/innofw/badge/?version=latest)](https://innofw.readthedocs.io/en/latest/?badge=latest)
 
-
 # What is InnoFW?
 
 InnoFW is a configuration-based machine learning framework that helps people to get started with development of machine learning solutions. InnoFW is easy to pickup and play. And easy to master.
@@ -34,7 +33,7 @@ InnoFW uses hydra to provide configuration structure that is suitable for the mo
 
 1. Create an experiment config file in the folder ```config/experiments/``` based on ```config/experiments/template.yaml```.
 2. Once you define your configuration file you can start training your model.
-    ```python train.py experiment=yolov5_cars```
+    ```python train.py experiments=yolov5_cars```
 3. InnoFW checks the configuration file for consistency of individual modules(model, dataset, loss, optimizer etc.) and if everything is fine then selects and adapter. Adapter is responsible for starting the training, testing, validation and inference pipeline.
 4. Model is being trained and checkpoints saved.
 
